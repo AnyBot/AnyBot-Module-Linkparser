@@ -14,10 +14,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.input.SAXBuilder;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-
-//     **/*.java,**/*.form
 
 /**
  *
@@ -87,23 +89,51 @@ public class LinkParser extends Module
 
    private ParserResult parseMetaTags(String url)
    {
-      if(Regex.isRegexTrue(url, "^http://www\\.golem\\.de/") || Regex.isRegexTrue(url, "^http://www\\.heise\\.de/"))
-      {
-         String module = Regex.findByRegexFirst("^http://www\\.(.*?)/", url);
-         try {
-            HTTPConnector client = new HTTPConnector();
-            String site = client.responseToString(client.doGet(url));
-            client.close();
+      //if(Regex.isRegexTrue(url, "^http://www\\.golem\\.de/") || Regex.isRegexTrue(url, "^http://www\\.heise\\.de/"))
+      //{
+      String module = Regex.findByRegexFirst("^http://(.*?)/", url);
+      try {
+         HTTPConnector client = new HTTPConnector();
+         String site = client.responseToString(client.doGet(url));
+         client.close();
 
-            String title = Regex.findByRegexFirst("<meta name=\"fulltitle\" content=\"([^\"]+)\"", site);
-            String desc = Regex.findByRegexFirst("<meta name=\"description\" content=\"([^\"]+)\"", site);
+         String title = null;
+         String desc = null;
 
-            if(title!=null && desc!=null)
+         ArrayList<HeadTag> metatitlefields = new ArrayList<>();
+         metatitlefields.add(HeadTag.metaName("fulltitle"));
+         metatitlefields.add(HeadTag.metaName("DC.title"));
+         metatitlefields.add(HeadTag.metaProperty("og:title"));
+
+         ArrayList<HeadTag> metadescrfields = new ArrayList<>();
+         metadescrfields.add(HeadTag.metaProperty("og:description"));
+         metadescrfields.add(HeadTag.metaName("twitter:description"));
+
+         SAXBuilder domparser = new SAXBuilder();
+         Document document = domparser.build(site);
+         List<Element> metas = document.getRootElement().getChild("head").getChildren("meta");
+
+         for(HeadTag tag : metatitlefields)
+         {
+            if(title==null)
             {
-               return new ParserResult(module, title, desc);
+               for(Element meta : metas)
+               {
+                  if(tag.getTagname().equalsIgnoreCase("meta") && meta.getAttributeValue(tag.getCheckproperty()).equalsIgnoreCase(tag.getCheckvalue()))
+                  {
+                     title = meta.getAttributeValue(tag.getValueproperty());
+                     break;
+                  }
+               }
             }
-         } catch (Exception ex) {  }
-      }
+         }
+
+         if(title!=null && desc!=null)
+         {
+            return new ParserResult(module, title, desc);
+         }
+      } catch (Exception ex) {  }
+      //}
       return null;
    }
 

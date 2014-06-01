@@ -14,12 +14,13 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.input.SAXBuilder;
+import org.apache.http.HttpResponse;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 /**
  *
@@ -38,6 +39,7 @@ public class LinkParser extends Module
    }
 
 
+   @Override
    public void launch()
    {
       this.twittercredentials = new TwitterApiCredentials("fillmeout", "fillmeout");
@@ -86,19 +88,45 @@ public class LinkParser extends Module
          }
       }
    }
+   
+   private String getPriorityTagContent(Elements sourceelements, ArrayList<HeadTag> searchtags)
+   {
+      for(Element element : sourceelements)
+      {
+         for(HeadTag tag : searchtags)
+         {
+            String checkattribute = tag.getCheckproperty();
+            String checkvalue = tag.getCheckvalue();
+            String valueattribute = tag.getValueproperty();
+            String tagname = tag.getTagname();
+            
+            if(element.nodeName().equals(tagname) && element.attr(checkattribute)!=null && element.attr(valueattribute)!=null &&
+               element.attr(checkattribute).equals(checkvalue))
+            {
+               return element.attr(valueattribute);
+            }
+         }
+      }
+      return null;
+   }
 
    private ParserResult parseMetaTags(String url)
    {
       //if(Regex.isRegexTrue(url, "^http://www\\.golem\\.de/") || Regex.isRegexTrue(url, "^http://www\\.heise\\.de/"))
       //{
-      String module = Regex.findByRegexFirst("^http://(.*?)/", url);
+      String module = Regex.findByRegexFirst("^https?://(.*?)/", url);
       try {
          HTTPConnector client = new HTTPConnector();
-         String site = client.responseToString(client.doGet(url));
+         HttpResponse response = client.doGet(url);
+         
+         String contenttype = response.getLastHeader("Content-Type").getValue();
+         if(!contenttype.startsWith("text/html"))
+         {
+            return null;
+         }
+         
+         String site = client.responseToString(response);
          client.close();
-
-         String title = null;
-         String desc = null;
 
          ArrayList<HeadTag> metatitlefields = new ArrayList<>();
          metatitlefields.add(HeadTag.metaName("fulltitle"));
@@ -109,30 +137,18 @@ public class LinkParser extends Module
          metadescrfields.add(HeadTag.metaProperty("og:description"));
          metadescrfields.add(HeadTag.metaName("twitter:description"));
 
-         SAXBuilder domparser = new SAXBuilder();
-         Document document = domparser.build(site);
-         List<Element> metas = document.getRootElement().getChild("head").getChildren("meta");
+         Document sitedocument = Jsoup.parse(site);
+         Elements metaelements = sitedocument.select("head meta");
 
-         for(HeadTag tag : metatitlefields)
-         {
-            if(title==null)
-            {
-               for(Element meta : metas)
-               {
-                  if(tag.getTagname().equalsIgnoreCase("meta") && meta.getAttributeValue(tag.getCheckproperty()).equalsIgnoreCase(tag.getCheckvalue()))
-                  {
-                     title = meta.getAttributeValue(tag.getValueproperty());
-                     break;
-                  }
-               }
-            }
-         }
+         String title = this.getPriorityTagContent(metaelements, metatitlefields);
+         String descr = this.getPriorityTagContent(metaelements, metadescrfields);
 
-         if(title!=null && desc!=null)
+         if(title!=null)
          {
-            return new ParserResult(module, title, desc);
+            return new ParserResult(module, title, descr);
          }
-      } catch (Exception ex) {  }
+         
+      } catch (Exception ex) { return new ParserResult("linkparser", ex.getMessage()); }
       //}
       return null;
    }

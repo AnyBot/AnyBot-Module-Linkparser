@@ -11,6 +11,7 @@ import eu.anynet.java.util.HTTPConnector;
 import eu.anynet.java.util.Regex;
 import eu.anynet.java.util.Serializer;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -75,9 +76,11 @@ public class LinkParser extends Module
                String url = iterator.next().get(0);
                ParserResult r = null;
 
-               if(r==null && (r = this.parseMetaTags(url)) != null);
+               this.getBot().sendDebug("[linkparser] Parse URL: "+url);
+
                if(r==null && (r = this.parseTwitter(url)) != null);
                if(r==null && (r = this.parseYoutube(url)) != null);
+               if(r==null && (r = this.parseMetaTags(url)) != null);
 
                if(r!=null) {
                   r.build(msg);
@@ -88,7 +91,7 @@ public class LinkParser extends Module
          }
       }
    }
-   
+
    private String getPriorityTagContent(Elements sourceelements, ArrayList<HeadTag> searchtags)
    {
       for(Element element : sourceelements)
@@ -99,7 +102,7 @@ public class LinkParser extends Module
             String checkvalue = tag.getCheckvalue();
             String valueattribute = tag.getValueproperty();
             String tagname = tag.getTagname();
-            
+
             if(element.nodeName().equals(tagname) && element.attr(checkattribute)!=null && element.attr(valueattribute)!=null &&
                element.attr(checkattribute).equals(checkvalue))
             {
@@ -118,13 +121,13 @@ public class LinkParser extends Module
       try {
          HTTPConnector client = new HTTPConnector();
          HttpResponse response = client.doGet(url);
-         
+
          String contenttype = response.getLastHeader("Content-Type").getValue();
          if(!contenttype.startsWith("text/html"))
          {
             return null;
          }
-         
+
          String site = client.responseToString(response);
          client.close();
 
@@ -147,8 +150,10 @@ public class LinkParser extends Module
          {
             return new ParserResult(module, title, descr);
          }
-         
-      } catch (Exception ex) { return new ParserResult("linkparser", ex.getMessage()); }
+
+      } catch (IOException ex) {
+         this.getBot().sendDebug("[linkparser] Metaparser IOException: "+ex.getMessage());
+      }
       //}
       return null;
    }
@@ -159,7 +164,7 @@ public class LinkParser extends Module
       {
          if(this.twittercredentials==null)
          {
-            return new ParserResult("twitter", "Error: No Api Keys found. Please fill twittercredentials.xml file");
+            this.getBot().sendDebug("[linkparser] twitter error: No Api Keys found. Please fill twittercredentials.xml file");
          }
 
          HTTPConnector client = new HTTPConnector();
@@ -188,8 +193,8 @@ public class LinkParser extends Module
                         String user = ((JSONObject)tweet_json.get("user")).get("screen_name").toString();
                         return new ParserResult("twitter", user+": "+text);
                      }
-                  } catch(Exception subex) {
-                     return new ParserResult("twitter", "Could not get status from twitter RESTful API");
+                  } catch(IOException subex) {
+                     this.getBot().sendDebug("[linkparser] Twitter IOException: "+subex.getMessage());
                   }
                }
 
@@ -214,8 +219,8 @@ public class LinkParser extends Module
                      {
                         return new ParserResult("twitter", "No tweets in timeline found");
                      }
-                  } catch(Exception subex) {
-                     return new ParserResult("twitter", "Could not get user timeline from twitter RESTful API: "+subex.getMessage());
+                  } catch(IOException subex) {
+                     this.getBot().sendDebug("[linkparser] Twitter IOException: "+subex.getMessage());
                   }
                }
 
@@ -226,7 +231,7 @@ public class LinkParser extends Module
             }
 
          } catch(Exception ex) {
-            return new ParserResult("twitter", "Exception: "+ex.getMessage());
+            this.getBot().sendDebug("[linkparser] Twitter Exception: "+ex.getMessage());
          }
          finally
          {
@@ -257,7 +262,7 @@ public class LinkParser extends Module
             }
          }
          catch(Exception ex) {
-            return new ParserResult("youtube", "Exception: "+ex.getMessage());
+            this.getBot().sendDebug("[linkparser] Twitter Exception: "+ex.getMessage());
          }
          finally
          {

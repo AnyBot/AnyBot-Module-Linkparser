@@ -4,7 +4,7 @@
  */
 package eu.anynet.anybot.module.linkparser;
 
-import eu.anynet.anybot.bot.ChatMessage;
+import eu.anynet.anybot.pircbotxextensions.MessageEventEx;
 import java.util.ArrayList;
 import org.apache.commons.lang3.StringEscapeUtils;
 
@@ -31,7 +31,7 @@ public class ParserResult
    private String title;
    private ArrayList<String> longtext;
 
-   public void build(ChatMessage msg)
+   public void build(MessageEventEx msg)
    {
       String headline = "["+module+"] "+title;
       msg.respond(headline);

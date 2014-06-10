@@ -4,8 +4,8 @@
  */
 package eu.anynet.anybot.module.linkparser;
 
-import eu.anynet.anybot.bot.ChatMessage;
 import eu.anynet.anybot.bot.Module;
+import eu.anynet.anybot.pircbotxextensions.MessageEventEx;
 import eu.anynet.java.twitter.TwitterApiCredentials;
 import eu.anynet.java.util.HTTPConnector;
 import eu.anynet.java.util.Regex;
@@ -61,7 +61,7 @@ public class LinkParser extends Module
 
 
    @Override
-   public void onMessage(ChatMessage msg)
+   public void onMessage(MessageEventEx msg)
    {
       if(msg.isChannelMessage())
       {

@@ -34,14 +34,14 @@ public class ParserResult
    public void build(MessageEventEx msg)
    {
       String headline = "["+module+"] "+title;
-      msg.respond(headline);
+      msg.respondNoHighlight(headline);
       if(longtext!=null && longtext.size()>0)
       {
          for(Object temp : longtext.toArray())
          {
             if(temp!=null)
             {
-               msg.respond(temp.toString());
+               msg.respondNoHighlight(temp.toString());
             }
          }
       }

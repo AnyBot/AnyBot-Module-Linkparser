@@ -7,15 +7,16 @@ package eu.anynet.anybot.module.linkparser;
 import eu.anynet.anybot.bot.Module;
 import eu.anynet.anybot.pircbotxextensions.MessageEventEx;
 import eu.anynet.java.twitter.TwitterApiCredentials;
-import eu.anynet.java.util.HTTPConnector;
+import eu.anynet.java.util.HttpClient;
 import eu.anynet.java.util.Regex;
 import eu.anynet.java.util.Serializer;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.fluent.Request;
+import org.apache.http.client.fluent.Response;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.jsoup.Jsoup;
@@ -115,21 +116,19 @@ public class LinkParser extends Module
 
    private ParserResult parseMetaTags(String url)
    {
-      //if(Regex.isRegexTrue(url, "^http://www\\.golem\\.de/") || Regex.isRegexTrue(url, "^http://www\\.heise\\.de/"))
-      //{
       String module = Regex.findByRegexFirst("^https?://(.*?)/", url);
       try {
-         HTTPConnector client = new HTTPConnector();
-         HttpResponse response = client.doGet(url);
-
-         String contenttype = response.getLastHeader("Content-Type").getValue();
+         Response response = HttpClient.Get(url).execute();
+         HttpResponse httpresponse = response.returnResponse();
+         String contenttype = httpresponse.getLastHeader("Content-Type").getValue();
          if(!contenttype.startsWith("text/html"))
          {
+            this.getBot().sendDebug("[linkparser] parseMetaTags: Is not a text/html response");
             return null;
          }
 
-         String site = client.responseToString(response);
-         client.close();
+         String site = HttpClient.toString(httpresponse.getEntity().getContent(), 64);
+         this.getBot().sendDebug("[linkparser] parseMetaTage: "+site.length()+" Byte");
 
          ArrayList<HeadTag> metatitlefields = new ArrayList<>();
          metatitlefields.add(HeadTag.metaName("fulltitle"));
@@ -154,7 +153,6 @@ public class LinkParser extends Module
       } catch (IOException ex) {
          this.getBot().sendDebug("[linkparser] Metaparser IOException: "+ex.getMessage());
       }
-      //}
       return null;
    }
 
@@ -167,7 +165,6 @@ public class LinkParser extends Module
             this.getBot().sendDebug("[linkparser] twitter error: No Api Keys found. Please fill twittercredentials.xml file");
          }
 
-         HTTPConnector client = new HTTPConnector();
          try {
             if(!this.twittercredentials.isBearerTokenAvailable())
             {
@@ -177,16 +174,18 @@ public class LinkParser extends Module
             String token = this.twittercredentials.getBearerToken();
             if(token!=null)
             {
-               HashMap<String,String> headers = new HashMap<>();
-               headers.put("Authorization", "Bearer "+token);
                String result = null;
 
                //--> Single Tweet: https://twitter.com/twiddern/status/468877914420023296
                result = Regex.findByRegexFirst("^https://twitter\\.com/.*?/status/([0-9]+)$", url);
                if(result!=null)
                {
-                  try {
-                     JSONObject tweet_json = client.responseToJSONObject(client.doGet("https://api.twitter.com/1.1/statuses/show.json?id="+result, null, headers));
+                  try
+                  {
+                     Request request = HttpClient.Get("https://api.twitter.com/1.1/statuses/show.json?id="+result)
+                        .addHeader("Authorization", "Bearer "+token);
+
+                     JSONObject tweet_json = HttpClient.toJsonObject(request);
                      if(tweet_json.containsKey("text") && tweet_json.containsKey("user"))
                      {
                         String text = tweet_json.get("text").toString();
@@ -202,8 +201,12 @@ public class LinkParser extends Module
                result = Regex.findByRegexFirst("^https://twitter.com/([^/]+)/?$", url);
                if(result!=null)
                {
-                  try {
-                     JSONArray tweets = client.responseToJSONArray(client.doGet("https://api.twitter.com/1.1/statuses/user_timeline.json?screen_name="+result+"&count=3", null, headers));
+                  try
+                  {
+                     Request request = HttpClient.Get("https://api.twitter.com/1.1/statuses/user_timeline.json?screen_name="+result+"&count=3")
+                        .addHeader("Authorization", "Bearer "+token);
+
+                     JSONArray tweets = HttpClient.toJsonArray(request);
 
                      if(tweets.size()>0)
                      {
@@ -233,10 +236,6 @@ public class LinkParser extends Module
          } catch(Exception ex) {
             this.getBot().sendDebug("[linkparser] Twitter Exception: "+ex.getMessage());
          }
-         finally
-         {
-            client.close();
-         }
       }
       return null;
    }
@@ -247,10 +246,9 @@ public class LinkParser extends Module
       String result = Regex.findByRegexFirst("https?://www\\.youtube\\.com/watch?.*?v=([^&\\s#]+)", url);
       if(result!=null)
       {
-         HTTPConnector client = new HTTPConnector();
          try
          {
-            JSONObject video = client.responseToJSONObject(client.doGet("http://gdata.youtube.com/feeds/api/videos/"+result+"?v=2&alt=json"));
+            JSONObject video = HttpClient.toJsonObject(HttpClient.Get("http://gdata.youtube.com/feeds/api/videos/"+result+"?v=2&alt=json"));
             if(video.containsKey("entry"))
             {
                String title = (((JSONObject)((JSONObject)video.get("entry")).get("title"))).get("$t").toString();
@@ -261,12 +259,8 @@ public class LinkParser extends Module
                return new ParserResult("youtube", "Video not found");
             }
          }
-         catch(Exception ex) {
+         catch(IOException ex) {
             this.getBot().sendDebug("[linkparser] Twitter Exception: "+ex.getMessage());
-         }
-         finally
-         {
-            client.close();
          }
       }
       return null;

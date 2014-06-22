@@ -127,7 +127,7 @@ public class LinkParser extends Module
             return null;
          }
 
-         String site = HttpClient.toString(httpresponse.getEntity().getContent(), 64);
+         String site = HttpClient.toString(httpresponse.getEntity().getContent(), 32*1024); // 32KB
          this.getBot().sendDebug("[linkparser] parseMetaTage: "+site.length()+" Byte");
 
          ArrayList<HeadTag> metatitlefields = new ArrayList<>();
@@ -158,7 +158,7 @@ public class LinkParser extends Module
 
    private ParserResult parseTwitter(String url)
    {
-      if(Regex.isRegexTrue(url, "^https://twitter.com/"))
+      if(Regex.isRegexTrue(url, "^https?://twitter.com/"))
       {
          if(this.twittercredentials==null)
          {

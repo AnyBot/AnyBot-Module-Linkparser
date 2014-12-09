@@ -33,6 +33,7 @@ public class LinkParser extends Module
 {
 
    private TwitterApiCredentials twittercredentials;
+   private static final int MSG_MAXLENGTH = 300;
 
 
    public LinkParser()
@@ -104,8 +105,9 @@ public class LinkParser extends Module
             String valueattribute = tag.getValueproperty();
             String tagname = tag.getTagname();
 
-            if(element.nodeName().equals(tagname) && element.attr(checkattribute)!=null && element.attr(valueattribute)!=null &&
-               element.attr(checkattribute).equals(checkvalue))
+            if(element.nodeName().toLowerCase().equals(tagname.toLowerCase()) &&
+               element.attr(checkattribute)!=null && element.attr(valueattribute)!=null &&
+               element.attr(checkattribute.toLowerCase()).equals(checkvalue.toLowerCase()))
             {
                return element.attr(valueattribute);
             }
@@ -117,17 +119,20 @@ public class LinkParser extends Module
    private ParserResult parseMetaTags(String url)
    {
       String module = Regex.findByRegexFirst("^https?://(.*?)/", url);
-      try {
+      try
+      {
          Response response = HttpClient.Get(url).execute();
          HttpResponse httpresponse = response.returnResponse();
-         String contenttype = httpresponse.getLastHeader("Content-Type").getValue();
+         String contenttype = httpresponse.getEntity().getContentType().getValue();
          if(!contenttype.startsWith("text/html"))
          {
             this.getBot().sendDebug("[linkparser] parseMetaTags: Is not a text/html response");
             return null;
          }
 
-         String site = HttpClient.toString(httpresponse.getEntity().getContent(), 32*1024); // 32KB
+         this.getBot().sendDebug("[linkparser] Content-Length: "+httpresponse.getEntity().getContentLength()+" Byte");
+
+         String site = HttpClient.toString(httpresponse.getEntity().getContent(), 32*1024); // 2MB = 2*1024*1024
          this.getBot().sendDebug("[linkparser] parseMetaTage: "+site.length()+" Byte");
 
          ArrayList<HeadTag> metatitlefields = new ArrayList<>();
@@ -145,12 +150,24 @@ public class LinkParser extends Module
          String title = this.getPriorityTagContent(metaelements, metatitlefields);
          String descr = this.getPriorityTagContent(metaelements, metadescrfields);
 
+         if(title!=null && title.length()>LinkParser.MSG_MAXLENGTH)
+         {
+            title = title.substring(0, LinkParser.MSG_MAXLENGTH)+" *snip*";
+         }
+
+         if(descr!=null && descr.length()>LinkParser.MSG_MAXLENGTH)
+         {
+            descr = descr.substring(0, LinkParser.MSG_MAXLENGTH)+" *snip*";
+         }
+
          if(title!=null)
          {
             return new ParserResult(module, title, descr);
          }
 
-      } catch (IOException ex) {
+      }
+      catch (IOException ex)
+      {
          this.getBot().sendDebug("[linkparser] Metaparser IOException: "+ex.getMessage());
       }
       return null;
@@ -177,7 +194,7 @@ public class LinkParser extends Module
                String result = null;
 
                //--> Single Tweet: https://twitter.com/twiddern/status/468877914420023296
-               result = Regex.findByRegexFirst("^https://twitter\\.com/.*?/status/([0-9]+)$", url);
+               result = Regex.findByRegexFirst("^https?://twitter\\.com/.*?/status/([0-9]+)$", url);
                if(result!=null)
                {
                   try
@@ -198,7 +215,7 @@ public class LinkParser extends Module
                }
 
                //--> User Timeline: https://twitter.com/twiddern
-               result = Regex.findByRegexFirst("^https://twitter.com/([^/]+)/?$", url);
+               result = Regex.findByRegexFirst("^https?://twitter.com/([^/]+)/?$", url);
                if(result!=null)
                {
                   try

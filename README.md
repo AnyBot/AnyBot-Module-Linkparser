@@ -1,4 +1,1 @@
-AnyBot-Module-Linkparser
-========================
-
-Linkparser Module for AnyBot
+Linkparser for AnyBot.
